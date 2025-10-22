@@ -4,6 +4,7 @@ from .database import Base, engine, SessionLocal
 from .models import StringRecord
 from .utils import analyze_string
 from .nlp_parser import parse_query
+from .schemas import StringCreate
 from sqlalchemy.orm import Session
 from fastapi import Depends
 
@@ -18,8 +19,8 @@ app = FastAPI()
 Base.metadata.create_all(bind=engine)
 
 @app.post("/strings", status_code=201)
-def create_string(data: dict, db: Session = Depends(get_db)):
-    value = data.get("value")
+def create_string(data: StringCreate, db: Session = Depends(get_db)):
+    value = data.value.strip()
     if not isinstance(value, str):
         raise HTTPException(status_code=422, detail="Value must be a string")
     existing = db.query(StringRecord).filter_by(value=value).first()

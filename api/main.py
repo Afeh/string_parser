@@ -7,15 +7,21 @@ from .nlp_parser import parse_query
 from sqlalchemy.orm import Session
 from fastapi import Depends
 
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
 app = FastAPI()
 Base.metadata.create_all(bind=engine)
 
 @app.post("/strings", status_code=201)
-def create_string(data: dict):
+def create_string(data: dict, db: Session = Depends(get_db)):
     value = data.get("value")
     if not isinstance(value, str):
         raise HTTPException(status_code=422, detail="Value must be a string")
-    db = SessionLocal()
     existing = db.query(StringRecord).filter_by(value=value).first()
     if existing:
         raise HTTPException(status_code=409, detail="String already exists")
@@ -29,19 +35,18 @@ def create_string(data: dict):
         "id": new_string.id,
         "value": new_string.value,
         "properties": props,
-        "created_at": props["created_at"]
+        "created_at": new_string.created_at
     }
 
 
 @app.get("/strings/filter-by-natural-language")
-def filter_by_natural_language(query: str):
+def filter_by_natural_language(query: str, db: Session = Depends(get_db)):
     try:
         parsed_filters = parse_query(query)
     except ValueError:
         raise HTTPException(status_code=400, detail="Unable to parse natural language query")
 
     # Reuse the filtering logic from /strings
-    db = SessionLocal()
     records = db.query(StringRecord).all()
     filtered = []
     for rec in records:
@@ -64,7 +69,7 @@ def filter_by_natural_language(query: str):
                 "id": r.id,
                 "value": r.value,
                 "properties": r.properties,
-                "created_at": r.created_at.isoformat(),
+                "created_at": r.created_at
             }
             for r in filtered
         ],
@@ -77,8 +82,7 @@ def filter_by_natural_language(query: str):
 
 
 @app.get("/strings/{string_value}")
-def get_string(string_value: str):
-    db = SessionLocal()
+def get_string(string_value: str, db: Session = Depends(get_db)):
     record = db.query(StringRecord).filter_by(value=string_value).first()
     if not record:
         raise HTTPException(status_code=404, detail="String not found")
@@ -86,7 +90,7 @@ def get_string(string_value: str):
         "id": record.id,
         "value": record.value,
         "properties": record.properties,
-        "created_at": record.created_at.isoformat()
+        "created_at": record.created_at
     }
 
 
@@ -97,8 +101,8 @@ def list_strings(
     max_length: Optional[int] = None,
     word_count: Optional[int] = None,
     contains_character: Optional[str] = None,
+    db: Session = Depends(get_db)
 ):
-    db = SessionLocal()
     records = db.query(StringRecord).all()
 
     # Apply filters
@@ -131,7 +135,7 @@ def list_strings(
                 "id": r.id,
                 "value": r.value,
                 "properties": r.properties,
-                "created_at": r.created_at.isoformat(),
+                "created_at": r.created_at
             }
             for r in filtered
         ],
@@ -141,8 +145,7 @@ def list_strings(
 
 
 @app.delete("/strings/{string_value}", status_code=204)
-def delete_string(string_value: str):
-    db = SessionLocal()
+def delete_string(string_value: str, db: Session = Depends(get_db)):
     record = db.query(StringRecord).filter_by(value=string_value).first()
     if not record:
         raise HTTPException(status_code=404, detail="String not found")

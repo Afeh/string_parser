@@ -10,5 +10,4 @@ def analyze_string(value: str):
         "word_count": len(value.split()),
         "sha256_hash": hashlib.sha256(value.encode()).hexdigest(),
         "character_frequency_map": {c: value.count(c) for c in set(value)},
-        "created_at": datetime.now(timezone.utc).isoformat(),
     }
